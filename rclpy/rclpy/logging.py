@@ -32,6 +32,23 @@ def get_logger(name: str) -> RcutilsLogger:
     return _root_logger.get_child(name)
 
 
+def get_logger_names(base_logger_name: Union[str, None] = None) -> list[str]:
+    """
+    Return sorted, unique registered logger names in this process.
+
+    With a base name, return its exact match and dot-separated descendants.
+    This filter describes logger names, not ownership by ROS nodes. With None,
+    return all registered names. Names survive logger object destruction and
+    context shutdown, but are cleared by logging.shutdown() or clear_config().
+    Merely setting a level or emitting a log does not register a name.
+
+    :raises ValueError: if the base name is empty
+    """
+    if base_logger_name == '':
+        raise ValueError('Base logger name must not be empty.')
+    return _rclpy.rclpy_logging_get_logger_names(base_logger_name)
+
+
 def initialize() -> None:
     _rclpy.rclpy_logging_initialize()
 
