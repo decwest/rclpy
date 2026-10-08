@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from rcl_interfaces.msg import LoggerLevel, SetLoggerLevelsResult
 from rcl_interfaces.srv import GetLoggerLevels
+from rcl_interfaces.srv import ListLoggers
 from rcl_interfaces.srv import SetLoggerLevels
 import rclpy
 from rclpy.impl.logging_severity import LoggingSeverity
@@ -30,6 +31,14 @@ class LoggingService:
 
     def __init__(self, node: 'BaseNode'):
         node_name = node.get_name()
+        self._logger_name = node.get_logger().name
+
+        list_logger_name_service_name = \
+            TOPIC_SEPARATOR_STRING.join((node_name, 'list_loggers'))
+        node.create_service(
+            ListLoggers, list_logger_name_service_name,
+            self._list_loggers, qos_profile=qos_profile_services_default
+        )
 
         get_logger_name_service_name = \
             TOPIC_SEPARATOR_STRING.join((node_name, 'get_logger_levels'))
@@ -44,6 +53,11 @@ class LoggingService:
             SetLoggerLevels, set_logger_name_service_name,
             self._set_logger_levels, qos_profile=qos_profile_services_default
         )
+
+    def _list_loggers(self, request: ListLoggers.Request,
+                      response: ListLoggers.Response) -> ListLoggers.Response:
+        response.names = rclpy.logging.get_logger_names(self._logger_name)
+        return response
 
     def _get_logger_levels(self, request: GetLoggerLevels.Request,
                            response: GetLoggerLevels.Response) -> GetLoggerLevels.Response:
