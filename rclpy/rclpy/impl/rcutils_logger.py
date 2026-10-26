@@ -290,6 +290,8 @@ class RcutilsLogger:
         self.name = name
         self.logger_sublogger_namepair: Optional[Tuple[str, str]] = None
         self.contexts: Dict[CallerId, RcutilsLoggerContext] = {}
+        if name:
+            _rclpy.rclpy_logging_register_logger(name)
 
     def __del__(self) -> None:
         if self.logger_sublogger_namepair:
@@ -308,8 +310,11 @@ class RcutilsLogger:
             fullname = name
 
         logger = RcutilsLogger(name=fullname)
-        if self.name and _rclpy.rclpy_logging_rosout_add_sublogger(self.name, name):
-            logger.logger_sublogger_namepair = (self.name, name)
+        if self.name:
+            # Allocate before adding the rosout entry so failure cannot leave it behind.
+            namepair = (self.name, name)
+            if _rclpy.rclpy_logging_rosout_add_sublogger(self.name, name):
+                logger.logger_sublogger_namepair = namepair
         return logger
 
     def set_level(self, level: Union[int, LoggingSeverity]) -> None:

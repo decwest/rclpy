@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace py = pybind11;
 
@@ -22,8 +23,10 @@ namespace py = pybind11;
 
 #include <rcl_logging_interface/rcl_logging_interface.h>
 #include <rcl/logging_rosout.h>
+#include <rcpputils/scope_exit.hpp>
 
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -32,6 +35,38 @@ namespace py = pybind11;
 #include "logging_api.hpp"
 
 static std::mutex g_logging_lock;
+
+/// Register a name without configuring its severity.
+void
+rclpy_logging_register_logger(const char * name)
+{
+  if (rcutils_logging_register_logger(name) != RCUTILS_RET_OK) {
+    throw std::runtime_error(rclpy::append_rcutils_error("Failed to register logger name"));
+  }
+}
+
+/// Return a copy of the registered logger-name hierarchy.
+py::list
+rclpy_logging_get_logger_names(const std::optional<std::string> & base_logger_name)
+{
+  rcutils_string_array_t names = rcutils_get_zero_initialized_string_array();
+  rcutils_ret_t ret = rcutils_logging_get_logger_names(
+    base_logger_name ? base_logger_name->c_str() : nullptr,
+    rcutils_get_default_allocator(), &names);
+  if (ret != RCUTILS_RET_OK) {
+    throw std::runtime_error(rclpy::append_rcutils_error("Failed to enumerate logger names"));
+  }
+  RCPPUTILS_SCOPE_EXIT(
+  {
+    rcutils_ret_t fini_ret = rcutils_string_array_fini(&names);
+    (void)fini_ret;
+    });
+  py::list result;
+  for (size_t i = 0; i < names.size; ++i) {
+    result.append(py::str(names.data[i]));
+  }
+  return result;
+}
 
 /// Initialize the logging system.
 /**
@@ -250,6 +285,10 @@ define_logging_api(py::module m)
   m.def("rclpy_logging_get_separator_string", []() {return RCUTILS_LOGGING_SEPARATOR_STRING;});
   m.def("rclpy_logging_initialize", &rclpy_logging_initialize);
   m.def("rclpy_logging_shutdown", &rclpy_logging_shutdown);
+  m.def("rclpy_logging_register_logger", &rclpy_logging_register_logger);
+  m.def(
+    "rclpy_logging_get_logger_names", &rclpy_logging_get_logger_names,
+    py::arg("base_logger_name") = py::none());
   m.def(
     "rclpy_logging_set_logger_level", &rclpy_logging_set_logger_level,
     py::arg("name"), py::arg("level"), py::arg("detailed_error") = false);
